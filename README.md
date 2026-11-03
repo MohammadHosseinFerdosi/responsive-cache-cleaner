@@ -2,7 +2,7 @@
 
 Firefox **and** Chrome extension for **responsive and layout QA**: keep CSS, JS, and images fresh while you resize, reload, and iterate. It clears on a timer, before navigations, and on demand — without wiping cookies or storage unless you opt in.
 
-**Version:** 2.3.2 · **Manifest:** V3 · **Requires:** Firefox 140+ (Android 142+) · Chrome 109+ · **License:** MIT
+**Version:** 2.3.3 · **Manifest:** V3 · **Requires:** Firefox 140+ (Android 142+) · Chrome 109+ · **License:** MIT
 
 **Stores:** [Firefox AMO](https://addons.mozilla.org/firefox/addon/responsive-test-cache-cleaner/) · Chrome Web Store (see listing after publish)
 
@@ -133,6 +133,10 @@ This extension clears on a timer (default every 5 seconds), before top-level nav
 Works on Chrome and Chromium (Manifest V3). No telemetry — settings stay in this browser profile only.
 
 ## Changelog
+
+### 2.3.3
+
+- Republish after AMO rejected reused 2.3.2 version number
 
 ### 2.3.2
 
