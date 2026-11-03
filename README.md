@@ -134,6 +134,13 @@ Works on Chrome and Chromium (Manifest V3). No telemetry — settings stay in th
 
 ## Changelog
 
+### 2.3.1
+
+- Gate background handlers until settings load (service-worker race fix)
+- Chrome badge restore via in-worker timer (+ alarm backup); skip redundant wake clears
+- Skip empty-allowlist interval clears; hide options allowlist until scope needs it
+- Harden host normalization; expand unit tests (browser-api, scope, clear-types)
+
 ### 2.3.0
 
 - Chrome / Chromium support (MV3 service worker) alongside Firefox
