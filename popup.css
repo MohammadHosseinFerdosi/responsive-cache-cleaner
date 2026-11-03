@@ -27,7 +27,7 @@
 * { box-sizing: border-box; }
 
 body {
-  width: 340px;
+  width: 360px;
   margin: 0;
   padding: 14px;
   font-family: "Segoe UI", "Helvetica Neue", sans-serif;
@@ -103,6 +103,13 @@ h1 {
   font-weight: 600;
 }
 
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .inline {
   display: flex;
   align-items: center;
@@ -135,6 +142,37 @@ textarea {
   min-height: 64px;
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: 12px;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 4px;
+}
+
+.presets-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .types {
@@ -196,12 +234,34 @@ button.secondary:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
+button.linkish {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.linkish:hover {
+  text-decoration: underline;
+}
+
 .status {
   min-height: 16px;
   font-size: 11px;
   color: var(--muted);
   margin: 10px 0 0;
   text-align: center;
+}
+
+.detail {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.35;
 }
 
 .error {
@@ -218,7 +278,10 @@ footer {
   margin-top: 10px;
   font-size: 10px;
   color: var(--muted);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   line-height: 1.4;
 }
 

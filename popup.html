@@ -55,9 +55,18 @@
   </section>
 
   <section class="field" id="allowlistSection" hidden>
-    <label for="allowlist">Allowlist domains</label>
+    <div class="label-row">
+      <label for="allowlist">Allowlist domains</label>
+      <button type="button" id="addCurrentHost" class="linkish">Add current site</button>
+    </div>
     <textarea id="allowlist" rows="3" placeholder="localhost&#10;127.0.0.1&#10;app.example.com"></textarea>
-    <span class="hint">One hostname per line. Subdomains match parent entries.</span>
+    <span class="hint" id="allowlistHint">One hostname per line. Subdomains match parent entries.</span>
+  </section>
+
+  <section class="presets">
+    <span class="presets-label">Presets</span>
+    <button type="button" id="presetQa" class="chip">QA defaults</button>
+    <button type="button" id="presetSw" class="chip">+ Service Workers</button>
   </section>
 
   <details class="types">
@@ -68,7 +77,7 @@
     </section>
     <section class="row compact">
       <label class="switch"><input type="checkbox" id="clearCacheStorage" /><span class="slider"></span></label>
-      <div class="row-text"><strong>Cache Storage</strong><span class="hint">Cache API via page script (Firefox)</span></div>
+      <div class="row-text"><strong>Cache Storage</strong><span class="hint">Cache API on matching open tabs</span></div>
     </section>
     <section class="row compact">
       <label class="switch"><input type="checkbox" id="clearServiceWorkers" /><span class="slider"></span></label>
@@ -76,7 +85,7 @@
     </section>
     <section class="row compact">
       <label class="switch"><input type="checkbox" id="clearLocalStorage" /><span class="slider"></span></label>
-      <div class="row-text"><strong>localStorage</strong><span class="hint">Opt-in — resets client state</span></div>
+      <div class="row-text"><strong>localStorage</strong><span class="hint">Opt-in — also clears sessionStorage</span></div>
     </section>
     <section class="row compact">
       <label class="switch"><input type="checkbox" id="clearIndexedDB" /><span class="slider"></span></label>
@@ -116,10 +125,12 @@
   </div>
 
   <p id="status" class="status" role="status"></p>
+  <p id="detail" class="detail" hidden></p>
   <p id="error" class="error" hidden></p>
 
   <footer>
-    Shortcuts: Alt+Shift+C clear · Alt+Shift+R clear + reload
+    <span>Alt+Shift+C clear · Alt+Shift+R clear + reload</span>
+    <button type="button" id="openOptions" class="linkish">Options</button>
   </footer>
 
   <script type="module" src="popup.js"></script>

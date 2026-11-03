@@ -1,6 +1,6 @@
 {
   "name": "responsive-cache-cleaner",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Firefox extension that keeps HTTP/Cache Storage fresh during responsive and layout testing",
   "type": "module",
@@ -8,7 +8,7 @@
     "test": "node --test test/*.test.js",
     "lint": "npx --yes web-ext@10.8.0 lint --source-dir . --ignore-files node_modules test package.json package-lock.json",
     "build": "npx --yes web-ext@10.8.0 build --source-dir . --overwrite-dest --ignore-files node_modules test package.json package-lock.json web-ext-artifacts",
-    "check:syntax": "node --check background.js && node --check popup.js && node --check lib/settings.js && node --check lib/scope.js && node --check lib/clear-types.js"
+    "check:syntax": "node --check background.js && node --check popup.js && node --check options.js && node --check lib/settings.js && node --check lib/scope.js && node --check lib/clear-types.js"
   },
   "engines": {
     "node": ">=18"

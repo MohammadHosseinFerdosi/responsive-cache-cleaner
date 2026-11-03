@@ -7,6 +7,8 @@ const els = {
   scope: document.getElementById("scope"),
   allowlistSection: document.getElementById("allowlistSection"),
   allowlist: document.getElementById("allowlist"),
+  allowlistHint: document.getElementById("allowlistHint"),
+  addCurrentHost: document.getElementById("addCurrentHost"),
   clearHttpCache: document.getElementById("clearHttpCache"),
   clearCacheStorage: document.getElementById("clearCacheStorage"),
   clearServiceWorkers: document.getElementById("clearServiceWorkers"),
@@ -17,8 +19,18 @@ const els = {
   hardReloadOnAuto: document.getElementById("hardReloadOnAuto"),
   clearNow: document.getElementById("clearNow"),
   clearReload: document.getElementById("clearReload"),
+  presetQa: document.getElementById("presetQa"),
+  presetSw: document.getElementById("presetSw"),
+  openOptions: document.getElementById("openOptions"),
   status: document.getElementById("status"),
+  detail: document.getElementById("detail"),
   error: document.getElementById("error")
+};
+
+const REASON_LABELS = {
+  manual: "manual",
+  interval: "timer",
+  navigate: "navigation"
 };
 
 function formatStatus(lastClearAt, lastClearReason) {
@@ -28,8 +40,11 @@ function formatStatus(lastClearAt, lastClearReason) {
     minute: "2-digit",
     second: "2-digit"
   });
-  const reason = lastClearReason ? ` (${lastClearReason})` : "";
-  return `Last cleared: ${when}${reason}`;
+  const ageSec = Math.max(0, Math.round((Date.now() - lastClearAt) / 1000));
+  const age =
+    ageSec < 60 ? `${ageSec}s ago` : `${Math.round(ageSec / 60)}m ago`;
+  const reason = REASON_LABELS[lastClearReason] || lastClearReason || "";
+  return `Last cleared ${age} · ${when}${reason ? ` · ${reason}` : ""}`;
 }
 
 function showError(message) {
@@ -42,8 +57,30 @@ function showError(message) {
   els.error.textContent = message;
 }
 
+function showDetail(detail) {
+  const summary =
+    detail && typeof detail === "object"
+      ? detail.summary || ""
+      : "";
+  if (!summary) {
+    els.detail.hidden = true;
+    els.detail.textContent = "";
+    return;
+  }
+  els.detail.hidden = false;
+  els.detail.textContent = summary;
+}
+
 function syncAllowlistVisibility() {
   els.allowlistSection.hidden = els.scope.value !== "allowlist";
+}
+
+function updateAllowlistHint(list) {
+  const n = Array.isArray(list) ? list.length : 0;
+  els.allowlistHint.textContent =
+    n === 0
+      ? "One hostname per line. Use “Add current site” or type hosts manually."
+      : `${n} domain${n === 1 ? "" : "s"} — subdomains match parent entries.`;
 }
 
 function readAllowlistText() {
@@ -69,8 +106,10 @@ function applyState(state) {
   els.hardReloadOnManual.checked = !!s.hardReloadOnManual;
   els.hardReloadOnAuto.checked = !!s.hardReloadOnAuto;
   els.status.textContent = formatStatus(state.lastClearAt, state.lastClearReason);
+  showDetail(state.lastClearDetail);
   showError(state.lastError || "");
   syncAllowlistVisibility();
+  updateAllowlistHint(s.allowlist);
 }
 
 async function refresh() {
@@ -112,6 +151,32 @@ els.scope.addEventListener("change", () => {
 
 els.allowlist.addEventListener("change", () => {
   pushSettings({ allowlist: readAllowlistText() });
+});
+
+els.addCurrentHost.addEventListener("click", async () => {
+  const state = await browser.runtime.sendMessage({ type: "ADD_CURRENT_TO_ALLOWLIST" });
+  applyState(state);
+  if (!state.ok) showError(state.lastError || "Could not add site");
+});
+
+els.presetQa.addEventListener("click", async () => {
+  const state = await browser.runtime.sendMessage({
+    type: "APPLY_PRESET",
+    preset: "qa"
+  });
+  applyState(state);
+});
+
+els.presetSw.addEventListener("click", async () => {
+  const state = await browser.runtime.sendMessage({
+    type: "APPLY_PRESET",
+    preset: "swBust"
+  });
+  applyState(state);
+});
+
+els.openOptions.addEventListener("click", () => {
+  browser.runtime.sendMessage({ type: "OPEN_OPTIONS" });
 });
 
 for (const key of [

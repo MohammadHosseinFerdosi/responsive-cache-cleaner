@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Responsive Cache Cleaner",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Keeps HTTP cache and Cache Storage fresh during responsive and layout testing — timer, navigation hooks, scoped clears, and hard reload.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -32,6 +32,10 @@
       "96": "icons/icon-96.png"
     },
     "default_title": "Responsive Cache Cleaner"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "commands": {
     "clear-now": {

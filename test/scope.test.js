@@ -4,7 +4,8 @@ import {
   buildRemovalFilter,
   hostnameMatchesAllowlist,
   parseHttpUrl,
-  shouldClearForUrl
+  shouldClearForUrl,
+  shouldInjectForTab
 } from "../lib/scope.js";
 
 describe("parseHttpUrl", () => {
@@ -34,6 +35,38 @@ describe("shouldClearForUrl", () => {
     assert.equal(shouldClearForUrl("currentTab", "about:blank"), false);
     assert.equal(shouldClearForUrl("allowlist", "https://a.test", ["a.test"]), true);
     assert.equal(shouldClearForUrl("allowlist", "https://b.test", ["a.test"]), false);
+  });
+});
+
+describe("shouldInjectForTab", () => {
+  const target = { hostname: "app.test", origin: "https://app.test" };
+
+  it("injects same-host tabs for scope all", () => {
+    assert.equal(shouldInjectForTab("all", "https://app.test/x", target, []), true);
+    assert.equal(shouldInjectForTab("all", "https://other.test/", target, []), false);
+    assert.equal(shouldInjectForTab("all", "https://app.test/", null, []), false);
+  });
+
+  it("injects allowlist matches", () => {
+    assert.equal(
+      shouldInjectForTab("allowlist", "https://a.staging.test/", target, ["staging.test"]),
+      true
+    );
+    assert.equal(
+      shouldInjectForTab("allowlist", "https://prod.test/", target, ["staging.test"]),
+      false
+    );
+  });
+
+  it("injects current-tab hostname matches", () => {
+    assert.equal(
+      shouldInjectForTab("currentTab", "http://app.test:3000/", target, []),
+      true
+    );
+    assert.equal(
+      shouldInjectForTab("currentTab", "http://other.test/", target, []),
+      false
+    );
   });
 });
 

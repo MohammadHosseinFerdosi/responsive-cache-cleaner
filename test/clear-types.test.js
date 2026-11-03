@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { planClear, planHasWork } from "../lib/clear-types.js";
+import { formatClearSummary, planClear, planHasWork } from "../lib/clear-types.js";
 
 const base = {
   clearHttpCache: true,
@@ -18,6 +18,8 @@ describe("planClear", () => {
     assert.equal(plan.browsingData.cacheStorage, undefined);
     assert.equal(plan.injectCacheStorage, true);
     assert.equal(plan.injectServiceWorkers, false);
+    assert.ok(plan.labels.includes("HTTP cache"));
+    assert.ok(plan.labels.includes("Cache Storage"));
   });
 
   it("uses browsingData cacheStorage on Chromium", () => {
@@ -45,5 +47,20 @@ describe("planClear", () => {
       { isFirefox: true }
     );
     assert.equal(planHasWork(plan), false);
+  });
+});
+
+describe("formatClearSummary", () => {
+  it("joins labels and inject stats", () => {
+    assert.equal(
+      formatClearSummary({
+        labels: ["HTTP cache", "Cache Storage"],
+        tabsInjected: 2,
+        cacheKeys: 3,
+        swUnregistered: 1
+      }),
+      "HTTP cache, Cache Storage · 2 tabs injected · 3 cache key(s) · 1 SW unregistered"
+    );
+    assert.equal(formatClearSummary({}), "cleared");
   });
 });

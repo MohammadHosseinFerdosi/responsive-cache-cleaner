@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Responsive Cache Cleaner — Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icons/icon-96.png" alt="" width="40" height="40" />
+      <div>
+        <h1>Responsive Cache Cleaner</h1>
+        <p class="subtitle">Options for responsive and layout QA sessions</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>Automation</h2>
+      <label class="row">
+        <input type="checkbox" id="enabled" />
+        <span>Auto clear enabled (timer + navigation hooks)</span>
+      </label>
+      <label class="field">
+        <span>Clear interval (seconds)</span>
+        <input type="number" id="interval" min="1" max="600" step="1" />
+      </label>
+      <label class="row">
+        <input type="checkbox" id="clearOnNavigate" />
+        <span>Clear before top-level navigation / reload</span>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Scope</h2>
+      <label class="field">
+        <span>Clear scope</span>
+        <select id="scope">
+          <option value="all">Entire browser (HTTP cache always global on Firefox)</option>
+          <option value="currentTab">Current tab site (storage / Cache API)</option>
+          <option value="allowlist">Domain allowlist only</option>
+        </select>
+      </label>
+      <label class="field" id="allowlistSection">
+        <span>Allowlist domains (one per line)</span>
+        <textarea id="allowlist" rows="5" placeholder="localhost&#10;127.0.0.1&#10;staging.example.com"></textarea>
+        <span class="hint">Subdomains match a parent entry (example.com → a.example.com).</span>
+      </label>
+      <button type="button" id="addCurrentHost" class="secondary">Add current tab site</button>
+    </section>
+
+    <section class="card">
+      <h2>What to clear</h2>
+      <p class="hint">QA defaults keep HTTP cache + Cache Storage on; cookies and storage stay off.</p>
+      <div class="presets">
+        <button type="button" id="presetQa" class="chip">Apply QA defaults</button>
+        <button type="button" id="presetSw" class="chip">QA + Service Workers</button>
+      </div>
+      <label class="row"><input type="checkbox" id="clearHttpCache" /><span>HTTP cache (global on Firefox)</span></label>
+      <label class="row"><input type="checkbox" id="clearCacheStorage" /><span>Cache Storage (injected on matching open tabs)</span></label>
+      <label class="row"><input type="checkbox" id="clearServiceWorkers" /><span>Service Workers (unregister + browsingData)</span></label>
+      <label class="row"><input type="checkbox" id="clearLocalStorage" /><span>localStorage / sessionStorage</span></label>
+      <label class="row"><input type="checkbox" id="clearIndexedDB" /><span>IndexedDB</span></label>
+      <label class="row"><input type="checkbox" id="clearCookies" /><span>Cookies</span></label>
+    </section>
+
+    <section class="card">
+      <h2>Hard reload &amp; feedback</h2>
+      <label class="row">
+        <input type="checkbox" id="hardReloadOnManual" />
+        <span>Hard reload after Clear now / shortcut</span>
+      </label>
+      <label class="row">
+        <input type="checkbox" id="hardReloadOnAuto" />
+        <span>Hard reload after timer clears</span>
+      </label>
+      <label class="row">
+        <input type="checkbox" id="hardReloadMatchingTabs" />
+        <span>Also hard-reload other matching open tabs</span>
+      </label>
+      <label class="row">
+        <input type="checkbox" id="badgeFlashOnClear" />
+        <span>Flash toolbar badge (OK / !) after each clear</span>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Shortcuts &amp; menus</h2>
+      <ul class="list">
+        <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> — clear now</li>
+        <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — clear + hard reload</li>
+        <li>Toolbar / page / tab context menu: clear, clear + reload</li>
+        <li>Page / tab context menu: add site to allowlist</li>
+      </ul>
+      <p class="hint">Rebind shortcuts in <code>about:addons</code> → gear → Manage Extension Shortcuts.</p>
+    </section>
+
+    <section class="card notes">
+      <h2>Firefox notes</h2>
+      <ul class="list">
+        <li>HTTP cache clearing via <code>browsingData</code> is always global; hostname filters do not limit it.</li>
+        <li>Cache Storage (Cache API) has no browsingData key on Firefox — this extension injects a page script on matching open tabs.</li>
+        <li>Manifest V3 uses a background event page (<code>background.scripts</code>), not an extension service worker.</li>
+        <li>Desktop: Firefox 140+. Android: Firefox 142+ when the add-on is available for that channel.</li>
+      </ul>
+    </section>
+
+    <p id="status" class="status" role="status"></p>
+    <p id="error" class="error" hidden></p>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
