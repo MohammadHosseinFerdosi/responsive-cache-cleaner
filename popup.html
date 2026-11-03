@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Responsive Cache Cleaner</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="icons/icon-48.png" alt="" width="22" height="22" />
+    <div>
+      <h1>Responsive Cache Cleaner</h1>
+      <p class="subtitle">Fresh assets for layout &amp; responsive QA</p>
+    </div>
+  </header>
+
+  <section class="row">
+    <label class="switch" title="Master switch">
+      <input type="checkbox" id="enabled" />
+      <span class="slider"></span>
+    </label>
+    <div class="row-text">
+      <strong>Auto clear enabled</strong>
+      <span class="hint">Timer and navigation hooks</span>
+    </div>
+  </section>
+
+  <section class="field">
+    <label for="interval">Clear every</label>
+    <div class="inline">
+      <input type="number" id="interval" min="1" max="600" step="1" />
+      <span>seconds</span>
+    </div>
+  </section>
+
+  <section class="row">
+    <label class="switch">
+      <input type="checkbox" id="clearOnNavigate" />
+      <span class="slider"></span>
+    </label>
+    <div class="row-text">
+      <strong>Clear before navigation</strong>
+      <span class="hint">Runs on top-level loads and reloads</span>
+    </div>
+  </section>
+
+  <section class="field">
+    <label for="scope">Scope</label>
+    <select id="scope">
+      <option value="all">Entire browser (HTTP cache always global on Firefox)</option>
+      <option value="currentTab">Current tab site (storage / Cache API)</option>
+      <option value="allowlist">Domain allowlist only</option>
+    </select>
+  </section>
+
+  <section class="field" id="allowlistSection" hidden>
+    <label for="allowlist">Allowlist domains</label>
+    <textarea id="allowlist" rows="3" placeholder="localhost&#10;127.0.0.1&#10;app.example.com"></textarea>
+    <span class="hint">One hostname per line. Subdomains match parent entries.</span>
+  </section>
+
+  <details class="types">
+    <summary>What to clear</summary>
+    <section class="row compact">
+      <label class="switch"><input type="checkbox" id="clearHttpCache" /><span class="slider"></span></label>
+      <div class="row-text"><strong>HTTP cache</strong><span class="hint">Network cache (global on Firefox)</span></div>
+    </section>
+    <section class="row compact">
+      <label class="switch"><input type="checkbox" id="clearCacheStorage" /><span class="slider"></span></label>
+      <div class="row-text"><strong>Cache Storage</strong><span class="hint">Cache API via page script (Firefox)</span></div>
+    </section>
+    <section class="row compact">
+      <label class="switch"><input type="checkbox" id="clearServiceWorkers" /><span class="slider"></span></label>
+      <div class="row-text"><strong>Service Workers</strong><span class="hint">Optional — may break offline apps</span></div>
+    </section>
+    <section class="row compact">
+      <label class="switch"><input type="checkbox" id="clearLocalStorage" /><span class="slider"></span></label>
+      <div class="row-text"><strong>localStorage</strong><span class="hint">Opt-in — resets client state</span></div>
+    </section>
+    <section class="row compact">
+      <label class="switch"><input type="checkbox" id="clearIndexedDB" /><span class="slider"></span></label>
+      <div class="row-text"><strong>IndexedDB</strong><span class="hint">Opt-in</span></div>
+    </section>
+    <section class="row compact">
+      <label class="switch"><input type="checkbox" id="clearCookies" /><span class="slider"></span></label>
+      <div class="row-text"><strong>Cookies</strong><span class="hint">Opt-in — logs you out</span></div>
+    </section>
+  </details>
+
+  <section class="row">
+    <label class="switch">
+      <input type="checkbox" id="hardReloadOnManual" />
+      <span class="slider"></span>
+    </label>
+    <div class="row-text">
+      <strong>Hard reload after Clear now</strong>
+      <span class="hint">tabs.reload with bypassCache</span>
+    </div>
+  </section>
+
+  <section class="row">
+    <label class="switch">
+      <input type="checkbox" id="hardReloadOnAuto" />
+      <span class="slider"></span>
+    </label>
+    <div class="row-text">
+      <strong>Hard reload after timer clear</strong>
+      <span class="hint">Off by default — can interrupt typing</span>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button type="button" id="clearNow" class="primary">Clear now</button>
+    <button type="button" id="clearReload" class="secondary">Clear + hard reload</button>
+  </div>
+
+  <p id="status" class="status" role="status"></p>
+  <p id="error" class="error" hidden></p>
+
+  <footer>
+    Shortcuts: Alt+Shift+C clear · Alt+Shift+R clear + reload
+  </footer>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

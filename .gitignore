@@ -1,0 +1,12 @@
+node_modules/
+web-ext-artifacts/
+*.zip
+.env
+.env.*
+*.pem
+*.key
+credentials*
+secrets/
+.DS_Store
+Thumbs.db
+package-lock.json
