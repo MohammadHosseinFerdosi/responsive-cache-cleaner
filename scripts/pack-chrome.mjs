@@ -83,20 +83,22 @@ if (archiver) {
   // after staging into a temp folder-free approach using tar isn't ideal on Windows.
   const { spawnSync } = await import("node:child_process");
   const staging = join(outDir, `_chrome_stage_${version}`);
-  const { rmSync, cpSync, mkdirSync: mkdir } = await import("node:fs");
+  const { rmSync, cpSync, mkdirSync: mkdir, renameSync } = await import("node:fs");
   if (existsSync(staging)) rmSync(staging, { recursive: true, force: true });
   for (const f of files) {
     const dest = join(staging, f.rel);
     mkdir(join(dest, ".."), { recursive: true });
     cpSync(f.abs, dest);
   }
-  if (existsSync(outFile)) rmSync(outFile, { force: true });
+  // Compress to a temp zip first so a failed Compress-Archive cannot wipe the prior package.
+  const tmpZip = `${outFile}.tmp.zip`;
+  if (existsSync(tmpZip)) rmSync(tmpZip, { force: true });
   const ps = spawnSync(
     "powershell.exe",
     [
       "-NoProfile",
       "-Command",
-      `Compress-Archive -Path (Join-Path '${staging}' '*') -DestinationPath '${outFile}' -Force`
+      `$ErrorActionPreference='Stop'; $src=Get-ChildItem -LiteralPath '${staging}' -Force; if(-not $src){ throw 'staging empty' }; Compress-Archive -Path $src.FullName -DestinationPath '${tmpZip}' -Force`
     ],
     { encoding: "utf8" }
   );
@@ -104,6 +106,8 @@ if (archiver) {
     console.error(ps.stdout, ps.stderr);
     process.exit(ps.status || 1);
   }
+  if (existsSync(outFile)) rmSync(outFile, { force: true });
+  renameSync(tmpZip, outFile);
   rmSync(staging, { recursive: true, force: true });
 }
 
