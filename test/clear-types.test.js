@@ -28,6 +28,12 @@ describe("planClear", () => {
     assert.equal(plan.injectCacheStorage, false);
   });
 
+  it("uses browsingData serviceWorkers on Chromium without inject", () => {
+    const plan = planClear({ ...base, clearServiceWorkers: true }, { isFirefox: false });
+    assert.equal(plan.browsingData.serviceWorkers, true);
+    assert.equal(plan.injectServiceWorkers, false);
+  });
+
   it("enables SW browsingData + inject on Firefox when requested", () => {
     const plan = planClear({ ...base, clearServiceWorkers: true }, { isFirefox: true });
     assert.equal(plan.browsingData.serviceWorkers, true);

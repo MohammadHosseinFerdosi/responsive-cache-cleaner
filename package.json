@@ -1,14 +1,15 @@
 {
   "name": "responsive-cache-cleaner",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
-  "description": "Firefox extension that keeps HTTP/Cache Storage fresh during responsive and layout testing",
+  "description": "Firefox + Chrome extension that keeps HTTP/Cache Storage fresh during responsive and layout testing",
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "lint": "npx --yes web-ext@10.8.0 lint --source-dir . --ignore-files node_modules test package.json package-lock.json",
-    "build": "npx --yes web-ext@10.8.0 build --source-dir . --overwrite-dest --ignore-files node_modules test package.json package-lock.json web-ext-artifacts",
-    "check:syntax": "node --check background.js && node --check popup.js && node --check options.js && node --check lib/settings.js && node --check lib/scope.js && node --check lib/clear-types.js"
+    "lint": "npx --yes web-ext@10.8.0 lint --source-dir . --ignore-files node_modules test package.json package-lock.json scripts web-ext-artifacts",
+    "build": "npx --yes web-ext@10.8.0 build --source-dir . --overwrite-dest --ignore-files node_modules test package.json package-lock.json scripts web-ext-artifacts",
+    "build:chrome": "node scripts/pack-chrome.mjs",
+    "check:syntax": "node --check background.js && node --check popup.js && node --check options.js && node --check lib/settings.js && node --check lib/scope.js && node --check lib/clear-types.js && node --check lib/browser-api.js"
   },
   "engines": {
     "node": ">=18"

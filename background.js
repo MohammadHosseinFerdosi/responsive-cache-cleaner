@@ -14,6 +14,7 @@ import {
   shouldInjectForTab
 } from "./lib/scope.js";
 import { formatClearSummary, planClear, planHasWork } from "./lib/clear-types.js";
+import { ext, isFirefox } from "./lib/browser-api.js";
 
 const ALARM_NAME = "periodic-clear";
 const BADGE_RESTORE_ALARM = "badge-restore";
@@ -26,9 +27,15 @@ let lastError = "";
 /** @type {Record<string, unknown>} */
 let lastClearDetail = {};
 let clearInFlight = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let chromeIntervalTimer = null;
 
 function api() {
-  return typeof browser !== "undefined" ? browser : chrome;
+  return ext();
+}
+
+function firefox() {
+  return isFirefox();
 }
 
 async function persistState(extra = {}) {
@@ -59,13 +66,44 @@ async function loadSettings() {
       : {};
 }
 
+/**
+ * Chromium throttles periodic alarms to ~1/minute. Keep a short setTimeout chain
+ * while the service worker is alive, and an alarm wake-up so the chain restarts.
+ */
+function clearChromeIntervalTimer() {
+  if (chromeIntervalTimer != null) {
+    clearTimeout(chromeIntervalTimer);
+    chromeIntervalTimer = null;
+  }
+}
+
+function scheduleChromeIntervalTick() {
+  clearChromeIntervalTimer();
+  if (firefox() || !settings.enabled || settings.intervalSeconds <= 0) return;
+  const ms = Math.max(1, settings.intervalSeconds) * 1000;
+  chromeIntervalTimer = setTimeout(() => {
+    chromeIntervalTimer = null;
+    clearCacheNow("interval", { forceHardReload: settings.hardReloadOnAuto }).finally(() => {
+      scheduleChromeIntervalTick();
+    });
+  }, ms);
+}
+
 async function applyAlarm() {
   await api().alarms.clear(ALARM_NAME);
-  if (settings.enabled && settings.intervalSeconds > 0) {
-    // alarms API unit is minutes; Firefox allows fractional minutes.
+  clearChromeIntervalTimer();
+  if (!settings.enabled || settings.intervalSeconds <= 0) return;
+
+  if (firefox()) {
+    // Firefox allows fractional minutes (sub-second resolution practically fine for QA).
     const periodInMinutes = Math.max(settings.intervalSeconds / 60, 1 / 60);
     api().alarms.create(ALARM_NAME, { periodInMinutes });
+    return;
   }
+
+  // Chromium: 1-minute alarm wakes a sleeping SW; in-SW timer handles sub-minute ticks.
+  api().alarms.create(ALARM_NAME, { periodInMinutes: 1 });
+  scheduleChromeIntervalTick();
 }
 
 async function updateBadge() {
@@ -126,6 +164,11 @@ async function collectInjectionTabs(activeTarget) {
     }
   }
   return matched;
+}
+
+async function listOpenTabUrls() {
+  const tabs = await api().tabs.query({});
+  return tabs.map((t) => t.url).filter((u) => typeof u === "string");
 }
 
 async function injectPageClear(tabId, { cacheStorage, serviceWorkers }) {
@@ -192,6 +235,7 @@ async function clearCacheNow(reason, opts = {}) {
           : await getActiveTab();
       const tabUrl = opts.url || tab?.url || "";
       const target = parseHttpUrl(tabUrl);
+      const onFirefox = firefox();
 
       // Navigation / current-tab interval: skip when the relevant URL is out of scope.
       // Allowlist interval still runs against listed hosts even if the active tab differs.
@@ -206,7 +250,7 @@ async function clearCacheNow(reason, opts = {}) {
       }
 
       const scoped = settings.scope !== "all";
-      const plan = planClear(settings, { isFirefox: true, scoped });
+      const plan = planClear(settings, { isFirefox: onFirefox, scoped });
       if (!planHasWork(plan)) {
         lastError = "No clear types enabled";
         await persistState();
@@ -214,7 +258,8 @@ async function clearCacheNow(reason, opts = {}) {
         return { ok: false, lastClearAt, lastError, lastClearDetail };
       }
 
-      // Split HTTP cache (always global on Firefox) from host-scoped storage types.
+      // Split HTTP cache (always global — origin/host filters do not apply) from
+      // storage types that accept hostnames (Firefox) or origins (Chromium).
       const storageTypes = { ...plan.browsingData };
       const httpCacheOnly = {};
       if (storageTypes.cache) {
@@ -222,11 +267,13 @@ async function clearCacheNow(reason, opts = {}) {
         delete storageTypes.cache;
       }
 
+      const tabUrls = onFirefox ? [] : await listOpenTabUrls();
       const filter = buildRemovalFilter(
         settings.scope,
         target,
         settings.allowlist,
-        true
+        onFirefox,
+        tabUrls
       );
 
       if (scoped && !filter && Object.keys(storageTypes).length > 0) {
@@ -239,13 +286,13 @@ async function clearCacheNow(reason, opts = {}) {
         return { ok: false, lastClearAt, lastError, lastClearDetail };
       }
 
-      // 1) Host-scoped storage / SW via browsingData (when any remain)
+      // 1) Host/origin-scoped storage / SW / Cache Storage via browsingData
       if (Object.keys(storageTypes).length > 0) {
         const removalOptions = scoped && filter ? filter : { since: 0 };
         await api().browsingData.remove(removalOptions, storageTypes);
       }
 
-      // 2) HTTP cache — Firefox always clears globally when enabled
+      // 2) HTTP cache — always global when enabled
       if (httpCacheOnly.cache) {
         if (
           settings.scope === "allowlist" &&
@@ -259,7 +306,8 @@ async function clearCacheNow(reason, opts = {}) {
         await api().browsingData.remove({ since: 0 }, httpCacheOnly);
       }
 
-      // 3) Page injection for Cache Storage / SW on all matching open tabs
+      // 3) Page injection for Cache Storage / SW on matching open tabs (Firefox;
+      //    Chromium uses browsingData for these, so inject flags are usually false)
       let tabsInjected = 0;
       let cacheKeys = 0;
       let swUnregistered = 0;
@@ -312,6 +360,11 @@ async function clearCacheNow(reason, opts = {}) {
         if (tab?.id != null && target) reloadIds.add(tab.id);
         if (settings.hardReloadMatchingTabs) {
           for (const id of injectedTabIds) reloadIds.add(id);
+          // Chromium: also reload matching open tabs even when injection was skipped
+          if (!onFirefox && (plan.browsingData.cacheStorage || plan.browsingData.serviceWorkers)) {
+            const matchTabs = await collectInjectionTabs(target);
+            for (const t of matchTabs) reloadIds.add(t.id);
+          }
         }
         for (const id of reloadIds) {
           try {
@@ -351,7 +404,8 @@ function getPublicState() {
     lastClearReason,
     lastError,
     lastClearDetail,
-    defaults: DEFAULT_SETTINGS
+    defaults: DEFAULT_SETTINGS,
+    runtime: firefox() ? "firefox" : "chromium"
   };
 }
 
@@ -361,6 +415,10 @@ api().alarms.onAlarm.addListener((alarm) => {
     return;
   }
   if (alarm.name !== ALARM_NAME || !settings.enabled) return;
+  if (!firefox()) {
+    // Wake path: restart the in-SW sub-minute timer; also run one clear now.
+    scheduleChromeIntervalTick();
+  }
   clearCacheNow("interval", { forceHardReload: settings.hardReloadOnAuto });
 });
 
@@ -394,7 +452,10 @@ async function ensureContextMenus() {
   } catch {
     // First install may have nothing to remove.
   }
-  const pageTabAction = ["action", "page", "tab"];
+  // "tab" context is Firefox-only; Chrome rejects unknown contexts.
+  const pageTabAction = firefox()
+    ? ["action", "page", "tab"]
+    : ["action", "page"];
   await menus.create({
     id: MENU_CLEAR,
     title: "Clear cache now",
@@ -408,7 +469,7 @@ async function ensureContextMenus() {
   await menus.create({
     id: MENU_ADD_ALLOWLIST,
     title: "Add site to allowlist",
-    contexts: ["page", "tab"]
+    contexts: firefox() ? ["page", "tab"] : ["page"]
   });
 }
 
@@ -511,6 +572,10 @@ api().runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ok: false, error: "Unknown message type" });
   })();
   return true;
+});
+
+api().runtime.onInstalled?.addListener(() => {
+  ensureContextMenus();
 });
 
 (async () => {

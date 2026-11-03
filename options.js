@@ -1,5 +1,9 @@
 "use strict";
 
+import { ext } from "./lib/browser-api.js";
+
+const browser = ext();
+
 const els = {
   enabled: document.getElementById("enabled"),
   interval: document.getElementById("interval"),

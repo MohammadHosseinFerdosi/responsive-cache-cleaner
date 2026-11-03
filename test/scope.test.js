@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   buildRemovalFilter,
+  collectChromeOrigins,
   hostnameMatchesAllowlist,
   parseHttpUrl,
   shouldClearForUrl,
@@ -89,5 +90,26 @@ describe("buildRemovalFilter", () => {
       buildRemovalFilter("currentTab", { hostname: "x.test", origin: "https://x.test" }, [], false),
       { since: 0, origins: ["https://x.test"] }
     );
+    assert.deepEqual(
+      buildRemovalFilter("allowlist", null, ["App.Test"], false),
+      { since: 0, origins: ["https://app.test", "http://app.test"] }
+    );
+  });
+
+  it("enriches chrome origins from open tabs (ports / subdomains)", () => {
+    const target = { hostname: "app.test", origin: "https://app.test" };
+    assert.deepEqual(
+      collectChromeOrigins("currentTab", target, [], ["http://app.test:3000/x"]),
+      ["https://app.test", "http://app.test:3000"]
+    );
+    const allow = collectChromeOrigins(
+      "allowlist",
+      null,
+      ["example.com"],
+      ["https://a.example.com:8443/app"]
+    );
+    assert.ok(allow.includes("https://example.com"));
+    assert.ok(allow.includes("http://example.com"));
+    assert.ok(allow.includes("https://a.example.com:8443"));
   });
 });

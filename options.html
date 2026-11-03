@@ -37,7 +37,7 @@
       <label class="field">
         <span>Clear scope</span>
         <select id="scope">
-          <option value="all">Entire browser (HTTP cache always global on Firefox)</option>
+          <option value="all">Entire browser (HTTP cache always global)</option>
           <option value="currentTab">Current tab site (storage / Cache API)</option>
           <option value="allowlist">Domain allowlist only</option>
         </select>
@@ -57,8 +57,8 @@
         <button type="button" id="presetQa" class="chip">Apply QA defaults</button>
         <button type="button" id="presetSw" class="chip">QA + Service Workers</button>
       </div>
-      <label class="row"><input type="checkbox" id="clearHttpCache" /><span>HTTP cache (global on Firefox)</span></label>
-      <label class="row"><input type="checkbox" id="clearCacheStorage" /><span>Cache Storage (injected on matching open tabs)</span></label>
+      <label class="row"><input type="checkbox" id="clearHttpCache" /><span>HTTP cache (always global)</span></label>
+      <label class="row"><input type="checkbox" id="clearCacheStorage" /><span>Cache Storage (Firefox: inject · Chrome: browsingData)</span></label>
       <label class="row"><input type="checkbox" id="clearServiceWorkers" /><span>Service Workers (unregister + browsingData)</span></label>
       <label class="row"><input type="checkbox" id="clearLocalStorage" /><span>localStorage / sessionStorage</span></label>
       <label class="row"><input type="checkbox" id="clearIndexedDB" /><span>IndexedDB</span></label>
@@ -93,16 +93,16 @@
         <li>Toolbar / page / tab context menu: clear, clear + reload</li>
         <li>Page / tab context menu: add site to allowlist</li>
       </ul>
-      <p class="hint">Rebind shortcuts in <code>about:addons</code> → gear → Manage Extension Shortcuts.</p>
+      <p class="hint">Firefox: rebind in <code>about:addons</code> → Manage Extension Shortcuts. Chrome: <code>chrome://extensions/shortcuts</code>.</p>
     </section>
 
     <section class="card notes">
-      <h2>Firefox notes</h2>
+      <h2>Browser notes</h2>
       <ul class="list">
-        <li>HTTP cache clearing via <code>browsingData</code> is always global; hostname filters do not limit it.</li>
-        <li>Cache Storage (Cache API) has no browsingData key on Firefox — this extension injects a page script on matching open tabs.</li>
-        <li>Manifest V3 uses a background event page (<code>background.scripts</code>), not an extension service worker.</li>
-        <li>Desktop: Firefox 140+. Android: Firefox 142+ when the add-on is available for that channel.</li>
+        <li><strong>HTTP cache</strong> via <code>browsingData</code> is always global on Firefox and Chromium; host/origin filters do not limit it.</li>
+        <li><strong>Firefox:</strong> Cache Storage has no browsingData key — cleared by page injection on matching open tabs. Background is an MV3 event page (<code>background.scripts</code>).</li>
+        <li><strong>Chrome:</strong> Cache Storage / service workers use <code>browsingData</code> with <code>origins</code>. Background is a module service worker. Sub-minute timers use an in-worker timer plus a 1-minute alarm wake-up (Chrome throttles periodic alarms).</li>
+        <li>Desktop: Firefox 140+ / Chrome 109+. Android: Firefox 142+ when listed for that channel.</li>
       </ul>
     </section>
 

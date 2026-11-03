@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Responsive Cache Cleaner",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Keeps HTTP cache and Cache Storage fresh during responsive and layout testing — timer, navigation hooks, scoped clears, and hard reload.",
   "icons": {
+    "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
-    "96": "icons/icon-96.png"
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
   },
   "permissions": [
     "alarms",
@@ -20,6 +22,7 @@
     "<all_urls>"
   ],
   "background": {
+    "service_worker": "background.js",
     "scripts": [
       "background.js"
     ],
@@ -28,8 +31,10 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
+      "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
-      "96": "icons/icon-96.png"
+      "96": "icons/icon-96.png",
+      "128": "icons/icon-128.png"
     },
     "default_title": "Responsive Cache Cleaner"
   },
@@ -51,6 +56,7 @@
       "description": "Clear cache and hard-reload the active tab"
     }
   },
+  "minimum_chrome_version": "109",
   "browser_specific_settings": {
     "gecko": {
       "id": "responsive-cache-cleaner@mhferdosii.local",
