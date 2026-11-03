@@ -38,6 +38,10 @@ function showError(message) {
   els.error.textContent = message;
 }
 
+function syncAllowlistVisibility() {
+  els.allowlistSection.hidden = els.scope.value !== "allowlist";
+}
+
 function readAllowlistText() {
   return els.allowlist.value
     .split(/\r?\n/)
@@ -66,6 +70,7 @@ function applyState(state) {
     ? `Last clear: ${new Date(state.lastClearAt).toLocaleString()}`
     : "No clears recorded yet in this profile";
   showError(state.lastError || "");
+  syncAllowlistVisibility();
 }
 
 async function refresh() {
@@ -106,7 +111,10 @@ els.interval.addEventListener("change", () => {
   pushSettings({ intervalSeconds: v });
 });
 
-els.scope.addEventListener("change", () => pushSettings({ scope: els.scope.value }));
+els.scope.addEventListener("change", () => {
+  syncAllowlistVisibility();
+  pushSettings({ scope: els.scope.value });
+});
 els.allowlist.addEventListener("change", () =>
   pushSettings({ allowlist: readAllowlistText() })
 );

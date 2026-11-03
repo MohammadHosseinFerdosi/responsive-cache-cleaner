@@ -37,9 +37,8 @@ function shouldSkip(absPath, relPosix) {
   if (parts.some((p) => IGNORE_DIRS.has(p))) return true;
   if (IGNORE_FILES.has(parts[parts.length - 1])) return true;
   if (relPosix.endsWith(".zip")) return true;
-  if (relPosix.endsWith(".md") && relPosix !== "README.md" && relPosix !== "LICENSE") {
-    // keep README + LICENSE; skip other markdown if any
-  }
+  // Keep README + LICENSE; skip other markdown if any.
+  if (relPosix.endsWith(".md") && relPosix !== "README.md") return true;
   return false;
 }
 

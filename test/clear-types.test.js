@@ -54,6 +54,42 @@ describe("planClear", () => {
     );
     assert.equal(planHasWork(plan), false);
   });
+
+  it("maps optional storage types on both engines", () => {
+    const flags = {
+      ...base,
+      clearLocalStorage: true,
+      clearIndexedDB: true,
+      clearCookies: true
+    };
+    const ff = planClear(flags, { isFirefox: true, scoped: true });
+    const cr = planClear(flags, { isFirefox: false, scoped: true });
+    assert.equal(ff.browsingData.localStorage, true);
+    assert.equal(ff.browsingData.indexedDB, true);
+    assert.equal(ff.browsingData.cookies, true);
+    assert.equal(cr.browsingData.localStorage, true);
+    assert.equal(cr.browsingData.indexedDB, true);
+    assert.equal(cr.browsingData.cookies, true);
+    assert.ok(planHasWork(ff));
+    assert.ok(planHasWork(cr));
+  });
+
+  it("treats cache-storage-only Firefox plan as inject work", () => {
+    const plan = planClear(
+      {
+        clearHttpCache: false,
+        clearCacheStorage: true,
+        clearServiceWorkers: false,
+        clearLocalStorage: false,
+        clearIndexedDB: false,
+        clearCookies: false
+      },
+      { isFirefox: true }
+    );
+    assert.equal(Object.keys(plan.browsingData).length, 0);
+    assert.equal(plan.injectCacheStorage, true);
+    assert.equal(planHasWork(plan), true);
+  });
 });
 
 describe("formatClearSummary", () => {
@@ -66,6 +102,10 @@ describe("formatClearSummary", () => {
         swUnregistered: 1
       }),
       "HTTP cache, Cache Storage · 2 tabs injected · 3 cache key(s) · 1 SW unregistered"
+    );
+    assert.equal(
+      formatClearSummary({ tabsInjected: 1, cacheKeys: 0, swUnregistered: 0 }),
+      "1 tab injected"
     );
     assert.equal(formatClearSummary({}), "cleared");
   });

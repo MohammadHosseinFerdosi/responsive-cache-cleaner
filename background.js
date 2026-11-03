@@ -122,8 +122,20 @@ async function updateBadge() {
   }
 }
 
+/** @type {ReturnType<typeof setTimeout> | null} */
+let badgeRestoreTimer = null;
+
+function clearBadgeRestoreTimer() {
+  if (badgeRestoreTimer != null) {
+    clearTimeout(badgeRestoreTimer);
+    badgeRestoreTimer = null;
+  }
+}
+
 async function flashBadge(ok) {
   if (!settings.badgeFlashOnClear) {
+    clearBadgeRestoreTimer();
+    await api().alarms.clear(BADGE_RESTORE_ALARM).catch(() => {});
     await updateBadge();
     return;
   }
@@ -134,8 +146,14 @@ async function flashBadge(ok) {
     await action.setBadgeBackgroundColor({
       color: ok ? "#0b6e4f" : "#b42318"
     });
-    await api().alarms.clear(BADGE_RESTORE_ALARM);
-    // ~1.8s — alarms use minutes
+    clearBadgeRestoreTimer();
+    await api().alarms.clear(BADGE_RESTORE_ALARM).catch(() => {});
+    // Prefer in-process timer while the worker/page is alive (Chrome throttles short alarms).
+    badgeRestoreTimer = setTimeout(() => {
+      badgeRestoreTimer = null;
+      updateBadge();
+    }, 1800);
+    // Alarm backup if the service worker sleeps before the timeout fires.
     api().alarms.create(BADGE_RESTORE_ALARM, { delayInMinutes: 0.03 });
   } catch {
     await updateBadge();
@@ -237,14 +255,22 @@ async function clearCacheNow(reason, opts = {}) {
       const target = parseHttpUrl(tabUrl);
       const onFirefox = firefox();
 
-      // Navigation / current-tab interval: skip when the relevant URL is out of scope.
-      // Allowlist interval still runs against listed hosts even if the active tab differs.
+      // Navigation / scoped interval: skip when there is nothing valid to clear.
+      // Allowlist interval still runs against listed hosts even if the active tab differs,
+      // but an empty allowlist is a no-op (avoids perpetual error badge flashes).
       if (reason === "navigate") {
         if (!shouldClearForUrl(settings.scope, tabUrl, settings.allowlist)) {
           return { ok: true, skipped: true, lastClearAt, lastError, lastClearDetail };
         }
-      } else if (reason === "interval" && settings.scope === "currentTab") {
-        if (!shouldClearForUrl("currentTab", tabUrl, settings.allowlist)) {
+      } else if (reason === "interval") {
+        if (settings.scope === "currentTab") {
+          if (!shouldClearForUrl("currentTab", tabUrl, settings.allowlist)) {
+            return { ok: true, skipped: true, lastClearAt, lastError, lastClearDetail };
+          }
+        } else if (
+          settings.scope === "allowlist" &&
+          (!settings.allowlist || settings.allowlist.length === 0)
+        ) {
           return { ok: true, skipped: true, lastClearAt, lastError, lastClearDetail };
         }
       }
@@ -409,37 +435,6 @@ function getPublicState() {
   };
 }
 
-api().alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === BADGE_RESTORE_ALARM) {
-    updateBadge();
-    return;
-  }
-  if (alarm.name !== ALARM_NAME || !settings.enabled) return;
-  if (!firefox()) {
-    // Wake path: restart the in-SW sub-minute timer; also run one clear now.
-    scheduleChromeIntervalTick();
-  }
-  clearCacheNow("interval", { forceHardReload: settings.hardReloadOnAuto });
-});
-
-api().webNavigation.onBeforeNavigate.addListener((details) => {
-  if (details.frameId !== 0) return;
-  if (!settings.enabled || !settings.clearOnNavigate) return;
-  clearCacheNow("navigate", {
-    tabId: details.tabId,
-    url: details.url,
-    forceHardReload: false
-  });
-});
-
-api().commands?.onCommand?.addListener(async (command) => {
-  if (command === "clear-now") {
-    await clearCacheNow("manual", { forceHardReload: false });
-  } else if (command === "clear-and-reload") {
-    await clearCacheNow("manual", { forceHardReload: true });
-  }
-});
-
 const MENU_CLEAR = "rcc-clear-now";
 const MENU_CLEAR_RELOAD = "rcc-clear-reload";
 const MENU_ADD_ALLOWLIST = "rcc-add-allowlist";
@@ -473,114 +468,169 @@ async function ensureContextMenus() {
   });
 }
 
-api().contextMenus?.onClicked?.addListener(async (info, tab) => {
-  const url = info.pageUrl || tab?.url || "";
-  if (info.menuItemId === MENU_CLEAR) {
-    clearCacheNow("manual", {
-      forceHardReload: false,
-      tabId: tab?.id,
-      url
-    });
-    return;
-  }
-  if (info.menuItemId === MENU_CLEAR_RELOAD) {
-    clearCacheNow("manual", {
-      forceHardReload: true,
-      tabId: tab?.id,
-      url
-    });
-    return;
-  }
-  if (info.menuItemId === MENU_ADD_ALLOWLIST) {
-    const parsed = parseHttpUrl(url);
-    if (!parsed) return;
-    settings = applySettingsPatch(settings, {
-      scope: "allowlist",
-      allowlist: addHostToAllowlist(settings.allowlist, parsed.hostname)
-    });
-    await api().storage.local.set(settings);
-    await updateBadge();
-  }
-});
-
-api().runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  (async () => {
-    if (!message || typeof message !== "object") {
-      sendResponse({ ok: false, error: "Invalid message" });
-      return;
-    }
-
-    if (message.type === "GET_STATE") {
-      sendResponse(getPublicState());
-      return;
-    }
-
-    if (message.type === "UPDATE_SETTINGS") {
-      settings = applySettingsPatch(settings, message.settings || {});
-      await api().storage.local.set(settings);
-      await applyAlarm();
-      await updateBadge();
-      sendResponse(getPublicState());
-      return;
-    }
-
-    if (message.type === "APPLY_PRESET") {
-      settings = applyPreset(settings, message.preset);
-      await api().storage.local.set(settings);
-      await applyAlarm();
-      await updateBadge();
-      sendResponse(getPublicState());
-      return;
-    }
-
-    if (message.type === "ADD_CURRENT_TO_ALLOWLIST") {
-      const active = await getActiveTab();
-      const parsed = parseHttpUrl(active?.url || "");
-      if (!parsed) {
-        sendResponse({
-          ...getPublicState(),
-          ok: false,
-          lastError: "No http(s) tab to add"
-        });
-        return;
-      }
-      settings = applySettingsPatch(settings, {
-        scope: "allowlist",
-        allowlist: addHostToAllowlist(settings.allowlist, parsed.hostname)
-      });
-      await api().storage.local.set(settings);
-      sendResponse({ ...getPublicState(), ok: true, addedHost: parsed.hostname });
-      return;
-    }
-
-    if (message.type === "CLEAR_NOW") {
-      const forceHardReload =
-        typeof message.hardReload === "boolean" ? message.hardReload : undefined;
-      const result = await clearCacheNow("manual", { forceHardReload });
-      sendResponse({ ...getPublicState(), ...result });
-      return;
-    }
-
-    if (message.type === "OPEN_OPTIONS") {
-      if (api().runtime.openOptionsPage) {
-        await api().runtime.openOptionsPage();
-      }
-      sendResponse({ ok: true });
-      return;
-    }
-
-    sendResponse({ ok: false, error: "Unknown message type" });
-  })();
-  return true;
-});
-
-api().runtime.onInstalled?.addListener(() => {
-  ensureContextMenus();
-});
-
-(async () => {
+/** Resolves after persisted settings are loaded — listeners must await this. */
+const ready = (async () => {
   await loadSettings();
   await applyAlarm();
   await updateBadge();
   await ensureContextMenus();
 })();
+
+api().alarms.onAlarm.addListener((alarm) => {
+  void ready.then(() => {
+    if (alarm.name === BADGE_RESTORE_ALARM) {
+      clearBadgeRestoreTimer();
+      updateBadge();
+      return;
+    }
+    if (alarm.name !== ALARM_NAME || !settings.enabled) return;
+    if (!firefox()) {
+      // If the in-SW timer is already running, it owns the interval cadence.
+      // Alarm only needs to clear + restart the chain after a sleep/wake.
+      const wasAwake = chromeIntervalTimer != null;
+      scheduleChromeIntervalTick();
+      if (wasAwake) return;
+    }
+    clearCacheNow("interval", { forceHardReload: settings.hardReloadOnAuto });
+  });
+});
+
+api().webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void ready.then(() => {
+    if (!settings.enabled || !settings.clearOnNavigate) return;
+    clearCacheNow("navigate", {
+      tabId: details.tabId,
+      url: details.url,
+      forceHardReload: false
+    });
+  });
+});
+
+api().commands?.onCommand?.addListener((command) => {
+  void ready.then(async () => {
+    if (command === "clear-now") {
+      await clearCacheNow("manual", { forceHardReload: false });
+    } else if (command === "clear-and-reload") {
+      await clearCacheNow("manual", { forceHardReload: true });
+    }
+  });
+});
+
+api().contextMenus?.onClicked?.addListener((info, tab) => {
+  void ready.then(async () => {
+    const url = info.pageUrl || tab?.url || "";
+    if (info.menuItemId === MENU_CLEAR) {
+      clearCacheNow("manual", {
+        forceHardReload: false,
+        tabId: tab?.id,
+        url
+      });
+      return;
+    }
+    if (info.menuItemId === MENU_CLEAR_RELOAD) {
+      clearCacheNow("manual", {
+        forceHardReload: true,
+        tabId: tab?.id,
+        url
+      });
+      return;
+    }
+    if (info.menuItemId === MENU_ADD_ALLOWLIST) {
+      const parsed = parseHttpUrl(url);
+      if (!parsed) return;
+      settings = applySettingsPatch(settings, {
+        scope: "allowlist",
+        allowlist: addHostToAllowlist(settings.allowlist, parsed.hostname)
+      });
+      await api().storage.local.set(settings);
+      await updateBadge();
+    }
+  });
+});
+
+api().runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  (async () => {
+    try {
+      await ready;
+      if (!message || typeof message !== "object") {
+        sendResponse({ ok: false, error: "Invalid message" });
+        return;
+      }
+
+      if (message.type === "GET_STATE") {
+        sendResponse(getPublicState());
+        return;
+      }
+
+      if (message.type === "UPDATE_SETTINGS") {
+        settings = applySettingsPatch(settings, message.settings || {});
+        await api().storage.local.set(settings);
+        await applyAlarm();
+        await updateBadge();
+        sendResponse(getPublicState());
+        return;
+      }
+
+      if (message.type === "APPLY_PRESET") {
+        settings = applyPreset(settings, message.preset);
+        await api().storage.local.set(settings);
+        await applyAlarm();
+        await updateBadge();
+        sendResponse(getPublicState());
+        return;
+      }
+
+      if (message.type === "ADD_CURRENT_TO_ALLOWLIST") {
+        const active = await getActiveTab();
+        const parsed = parseHttpUrl(active?.url || "");
+        if (!parsed) {
+          sendResponse({
+            ...getPublicState(),
+            ok: false,
+            lastError: "No http(s) tab to add"
+          });
+          return;
+        }
+        settings = applySettingsPatch(settings, {
+          scope: "allowlist",
+          allowlist: addHostToAllowlist(settings.allowlist, parsed.hostname)
+        });
+        await api().storage.local.set(settings);
+        sendResponse({ ...getPublicState(), ok: true, addedHost: parsed.hostname });
+        return;
+      }
+
+      if (message.type === "CLEAR_NOW") {
+        const forceHardReload =
+          typeof message.hardReload === "boolean" ? message.hardReload : undefined;
+        const result = await clearCacheNow("manual", { forceHardReload });
+        sendResponse({ ...getPublicState(), ...result });
+        return;
+      }
+
+      if (message.type === "OPEN_OPTIONS") {
+        if (api().runtime.openOptionsPage) {
+          await api().runtime.openOptionsPage();
+        }
+        sendResponse({ ok: true });
+        return;
+      }
+
+      sendResponse({ ok: false, error: "Unknown message type" });
+    } catch (err) {
+      const msg = err && err.message ? String(err.message) : String(err);
+      console.error("Responsive Cache Cleaner: message handler failed", err);
+      try {
+        sendResponse({ ok: false, error: msg, lastError: msg });
+      } catch {
+        // Port may already be closed.
+      }
+    }
+  })();
+  return true;
+});
+
+api().runtime.onInstalled?.addListener(() => {
+  void ready.then(() => ensureContextMenus());
+});

@@ -26,6 +26,18 @@ describe("hostnameMatchesAllowlist", () => {
     assert.equal(hostnameMatchesAllowlist("example.com", ["example.com"]), true);
     assert.equal(hostnameMatchesAllowlist("evil.com", ["example.com"]), false);
   });
+
+  it("does not treat suffix-only hosts as subdomains", () => {
+    assert.equal(hostnameMatchesAllowlist("notexample.com", ["example.com"]), false);
+    assert.equal(hostnameMatchesAllowlist("example.com.attacker.test", ["example.com"]), false);
+    assert.equal(hostnameMatchesAllowlist("a.example.com", [".example.com"]), true);
+  });
+
+  it("handles empty / invalid allowlist entries", () => {
+    assert.equal(hostnameMatchesAllowlist("a.test", []), false);
+    assert.equal(hostnameMatchesAllowlist("a.test", ["", null]), false);
+    assert.equal(hostnameMatchesAllowlist("", ["a.test"]), false);
+  });
 });
 
 describe("shouldClearForUrl", () => {
@@ -36,6 +48,13 @@ describe("shouldClearForUrl", () => {
     assert.equal(shouldClearForUrl("currentTab", "about:blank"), false);
     assert.equal(shouldClearForUrl("allowlist", "https://a.test", ["a.test"]), true);
     assert.equal(shouldClearForUrl("allowlist", "https://b.test", ["a.test"]), false);
+  });
+
+  it("skips chrome/extension schemes and empty non-http for scoped modes", () => {
+    assert.equal(shouldClearForUrl("all", "chrome://extensions"), false);
+    assert.equal(shouldClearForUrl("all", "chrome-extension://abc/popup.html"), false);
+    assert.equal(shouldClearForUrl("currentTab", ""), false);
+    assert.equal(shouldClearForUrl("allowlist", "https://a.test", []), false);
   });
 });
 
@@ -96,6 +115,13 @@ describe("buildRemovalFilter", () => {
     );
   });
 
+  it("returns null when scoped target / allowlist cannot be resolved", () => {
+    assert.equal(buildRemovalFilter("currentTab", null, [], true), null);
+    assert.equal(buildRemovalFilter("currentTab", null, [], false), null);
+    assert.equal(buildRemovalFilter("allowlist", null, [], false), null);
+    assert.equal(buildRemovalFilter("allowlist", null, ["", "  "], true), null);
+  });
+
   it("enriches chrome origins from open tabs (ports / subdomains)", () => {
     const target = { hostname: "app.test", origin: "https://app.test" };
     assert.deepEqual(
@@ -111,5 +137,15 @@ describe("buildRemovalFilter", () => {
     assert.ok(allow.includes("https://example.com"));
     assert.ok(allow.includes("http://example.com"));
     assert.ok(allow.includes("https://a.example.com:8443"));
+  });
+
+  it("ignores non-http tab URLs when enriching chrome origins", () => {
+    const target = { hostname: "app.test", origin: "https://app.test" };
+    assert.deepEqual(
+      collectChromeOrigins("currentTab", target, [], ["about:blank", "chrome://newtab"]),
+      ["https://app.test"]
+    );
+    assert.deepEqual(collectChromeOrigins("all", target, [], ["https://x.test"]), null);
+    assert.deepEqual(collectChromeOrigins("currentTab", null, [], ["https://x.test"]), []);
   });
 });

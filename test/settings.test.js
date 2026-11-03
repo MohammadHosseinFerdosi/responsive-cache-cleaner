@@ -22,6 +22,13 @@ describe("normalizeAllowlist", () => {
   it("drops invalid entries", () => {
     assert.deepEqual(normalizeAllowlist(["https://x.com", "a/b", "ok.com", ""]), ["ok.com"]);
   });
+
+  it("strips leading dots and rejects ports / spaces", () => {
+    assert.deepEqual(normalizeAllowlist([".Example.COM", "host:443", "bad host", "127.0.0.1"]), [
+      "example.com",
+      "127.0.0.1"
+    ]);
+  });
 });
 
 describe("addHostToAllowlist", () => {
